@@ -76,6 +76,12 @@ func main() {
 	}
 }
 
+func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	// Lambda handler function
+	// Retrieve environment variables if needed
+	databaseURL := os.Getenv("DATABASE_URL")
+	port := os.Getenv("PORT")
+
 func setupDB() error {
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
