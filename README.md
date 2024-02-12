@@ -71,3 +71,14 @@ Value: postgres://username:password@localhost:5432/library_system
 Key: PORT
 Value: 8080
 
+
+
+
+
+Add Query Parameter for Pagination:
+
+Click on the "Params" tab below the URL input field.
+Add a query parameter named limit.
+Set the value of limit to the number of libraries you want to retrieve per page. For example, set limit to 10.
+
+http://localhost:8080/libraries?limit=5
