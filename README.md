@@ -57,3 +57,17 @@ go get github.com/joho/godotenv
 Replace `"Library_ID"` in the example JSON payload for the `add-book` endpoint with the actual UUID of the library to which you want to add the book.
 
 You can use these example JSON payloads in Postman to test each endpoint. Ensure that you set the correct request method (`POST` for endpoints that require data creation or modification, `GET` for endpoints that retrieve data) and that the server URL matches the server you are running locally (e.g., `http://localhost:8080`).
+
+
+
+
+
+DATABASE_URL=postgres://username:password@localhost:5432/library_system
+PORT=8080
+
+You can add key-value pairs for your environment variables. For example:
+Key: DATABASE_URL
+Value: postgres://username:password@localhost:5432/library_system
+Key: PORT
+Value: 8080
+
