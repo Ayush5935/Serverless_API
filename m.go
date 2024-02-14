@@ -59,25 +59,16 @@ func init() {
 }
 
 func main() {
-	http.HandleFunc("/register", registerUser)
-	http.HandleFunc("/login", loginUser)
-	http.HandleFunc("/libraries", getAllLibraries)
-	http.HandleFunc("/books", getAllBooks)
-	http.HandleFunc("/add-library", addLibrary)
-	http.HandleFunc("/add-book", addBook)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("Server listening on port %s...", port)
-
 	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
 		// Running on AWS Lambda
 		lambda.Start(handler)
 	} else {
 		// Running locally
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		log.Printf("Server listening on port %s...", port)
 		log.Fatal(http.ListenAndServe(":"+port, nil))
 	}
 }
@@ -88,6 +79,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	port := os.Getenv("PORT")
 
 	// Handle requests...
+
+	return events.APIGatewayProxyResponse{}, nil
 }
 
 func setupDB() error {
