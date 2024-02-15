@@ -239,3 +239,95 @@ func addBook(w http.ResponseWriter, r *http.Request) {
     }
     log.Printf("Response body from /books API: %s", body)
 }
+
+
+
+func addLibrary(w http.ResponseWriter, r *http.Request) {
+    // Add library handler logic...
+    // For example, parse the request body to extract library data
+
+    // Make an API call to another API using POST method
+    requestBody := []byte(`{"username": "user1", "password": "password1"}`)
+    resp, err := http.Post("https://api.example.com/add-library", "application/json", bytes.NewBuffer(requestBody))
+    if err != nil {
+        log.Printf("Error making HTTP POST request to add library: %v", err)
+        // Handle error
+        return
+    }
+    defer resp.Body.Close()
+
+    // Handle the response from the other API as needed
+    // For example, you can read the response body and write it to the response writer
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading response body: %v", err)
+        // Handle error
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(resp.StatusCode)
+    w.Write(body)
+}
+
+
+
+
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+func addLibrary(w http.ResponseWriter, r *http.Request) {
+	// Add library handler logic...
+	// For example, parse the request body to extract library data
+
+	// Define request body
+	requestBody := map[string]string{
+		"username": "user1",
+		"password": "password1",
+	}
+
+	// Convert request body to JSON
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		log.Printf("Error marshaling request body: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Make an API call to another API using POST method
+	resp, err := http.Post("https://api.example.com/add-library", "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		log.Printf("Error making HTTP POST request to add library: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Handle the response from the other API as needed
+	// For example, you can read the response body and write it to the response writer
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading response body: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Set response headers and write response body
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	w.Write(body)
+}
+
+func main() {
+	http.HandleFunc("/add-library", addLibrary)
+
+	log.Println("Server started on port 8080...")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
