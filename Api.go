@@ -194,3 +194,48 @@ if err != nil {
 
 // Handle response as needed
 
+func addLibrary(w http.ResponseWriter, r *http.Request) {
+    // Add library handler logic...
+
+    // After adding the library, make an API call to fetch libraries from another API
+    resp, err := http.Get("https://api.example.com/libraries")
+    if err != nil {
+        log.Printf("Error making HTTP GET request to fetch libraries: %v", err)
+        // Handle error
+        return
+    }
+    defer resp.Body.Close()
+
+    // Process the response from the other API as needed
+    // For example, you can read the response body and log it
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading response body: %v", err)
+        // Handle error
+        return
+    }
+    log.Printf("Response body from /libraries API: %s", body)
+}
+
+func addBook(w http.ResponseWriter, r *http.Request) {
+    // Add book handler logic...
+
+    // After adding the book, make an API call to fetch books from another API
+    resp, err := http.Get("https://api.example.com/books")
+    if err != nil {
+        log.Printf("Error making HTTP GET request to fetch books: %v", err)
+        // Handle error
+        return
+    }
+    defer resp.Body.Close()
+
+    // Process the response from the other API as needed
+    // For example, you can read the response body and log it
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading response body: %v", err)
+        // Handle error
+        return
+    }
+    log.Printf("Response body from /books API: %s", body)
+}
