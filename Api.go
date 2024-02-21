@@ -8,9 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -57,277 +58,93 @@ func init() {
 }
 
 func main() {
-	// Running locally
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		// Running on AWS Lambda
+		lambda.Start(handler)
+	} else {
+		// Running locally
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		log.Printf("Server listening on port %s...", port)
+		log.Fatal(http.ListenAndServe(":"+port, nil))
 	}
-	log.Printf("Server listening on port %s...", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	switch request.HTTPMethod {
+	case "GET":
+		switch request.Path {
+		case "/libraries":
+			libraries, err := getAllLibraries()
+			if err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
+			}
+			body, err := json.Marshal(libraries)
+			if err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
+			}
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK, Body: string(body)}, nil
+		case "/books":
+			books, err := getAllBooks()
+			if err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
+			}
+			body, err := json.Marshal(books)
+			if err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
+			}
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK, Body: string(body)}, nil
+		default:
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusNotFound}, nil
+		}
+	case "POST":
+		switch request.Path {
+		case "/add-library":
+			var library Library
+			if err := json.Unmarshal([]byte(request.Body), &library); err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, err
+			}
+			if err := addLibrary(library); err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
+			}
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusCreated}, nil
+		case "/add-book":
+			var book Book
+			if err := json.Unmarshal([]byte(request.Body), &book); err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, err
+			}
+			if err := addBook(book); err != nil {
+				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
+			}
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusCreated}, nil
+		default:
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusNotFound}, nil
+		}
+	default:
+		return events.APIGatewayProxyResponse{StatusCode: http.StatusMethodNotAllowed}, nil
+	}
 }
 
 func setupDB() error {
-	// Database setup function...
+	// Database setup logic...
 }
 
-func registerUser(w http.ResponseWriter, r *http.Request) {
-	// Register user handler...
+func getAllLibraries() ([]Library, error) {
+	// Retrieve all libraries from the database
+	// and return them as a slice of Library structs
 }
 
-func loginUser(w http.ResponseWriter, r *http.Request) {
-	// Login user handler...
+func getAllBooks() ([]Book, error) {
+	// Retrieve all books from the database
+	// and return them as a slice of Book structs
 }
 
-func getAllLibraries(w http.ResponseWriter, r *http.Request) {
-	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
-	if err != nil || limit <= 0 {
-		limit = 10 // Default limit
-	}
-
-	// Fetch libraries concurrently using goroutines and channels
-	ch := make(chan []Library)
-	go fetchLibraries(limit, ch)
-
-	// Collect results from channel
-	libraries := <-ch
-
-	// Marshal libraries slice into JSON
-	librariesJSON, err := json.Marshal(libraries)
-	if err != nil {
-		log.Printf("Error marshaling libraries into JSON: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Set response headers
-	w.Header().Set("Content-Type", "application/json")
-
-	// Write response
-	w.Write(librariesJSON)
-
-	// Make HTTP request to another API
-	resp, err := http.Get("https://api.example.com/endpoint")
-	if err != nil {
-		log.Printf("Error making HTTP request: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Read response body
-	var responseBody map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&responseBody)
-	if err != nil {
-		log.Printf("Error decoding response body: %v", err)
-		return
-	}
-
-	// Handle response as needed
+func addLibrary(library Library) error {
+	// Add a new library to the database
 }
 
-func fetchLibraries(limit int, ch chan<- []Library) {
-	rows, err := db.Query("SELECT id, name FROM libraries ORDER BY name LIMIT $1", limit)
-	if err != nil {
-		log.Printf("Error fetching libraries: %v", err)
-		ch <- nil
-		return
-	}
-	defer rows.Close()
-
-	var libraries []Library
-	for rows.Next() {
-		var library Library
-		if err := rows.Scan(&library.ID, &library.Name); err != nil {
-			log.Printf("Error scanning library row: %v", err)
-			ch <- nil
-			return
-		}
-		libraries = append(libraries, library)
-	}
-
-	if err := rows.Err(); err != nil {
-		log.Printf("Error iterating over library rows: %v", err)
-		ch <- nil
-		return
-	}
-
-	ch <- libraries
+func addBook(book Book) error {
+	// Add a new book to the database
 }
-
-func getAllBooks(w http.ResponseWriter, r *http.Request) {
-	// Similar implementation as getAllLibraries, but for books
-}
-
-func addLibrary(w http.ResponseWriter, r *http.Request) {
-	// Add library handler...
-}
-
-func addBook(w http.ResponseWriter, r *http.Request) {
-	// Add book handler...
-}
-
-
-
-// Make HTTP request to another API
-resp, err := http.Get("https://api.example.com/endpoint")
-if err != nil {
-    log.Printf("Error making HTTP request: %v", err)
-    return
-}
-defer resp.Body.Close()
-
-// Read response body
-body, err := ioutil.ReadAll(resp.Body)
-if err != nil {
-    log.Printf("Error reading response body: %v", err)
-    return
-}
-
-log.Printf("Response body: %s", body) // Log the response body
-
-// Decode response body
-var responseBody map[string]interface{}
-err = json.Unmarshal(body, &responseBody)
-if err != nil {
-    log.Printf("Error decoding response body: %v", err)
-    return
-}
-
-// Handle response as needed
-
-func addLibrary(w http.ResponseWriter, r *http.Request) {
-    // Add library handler logic...
-
-    // After adding the library, make an API call to fetch libraries from another API
-    resp, err := http.Get("https://api.example.com/libraries")
-    if err != nil {
-        log.Printf("Error making HTTP GET request to fetch libraries: %v", err)
-        // Handle error
-        return
-    }
-    defer resp.Body.Close()
-
-    // Process the response from the other API as needed
-    // For example, you can read the response body and log it
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        log.Printf("Error reading response body: %v", err)
-        // Handle error
-        return
-    }
-    log.Printf("Response body from /libraries API: %s", body)
-}
-
-func addBook(w http.ResponseWriter, r *http.Request) {
-    // Add book handler logic...
-
-    // After adding the book, make an API call to fetch books from another API
-    resp, err := http.Get("https://api.example.com/books")
-    if err != nil {
-        log.Printf("Error making HTTP GET request to fetch books: %v", err)
-        // Handle error
-        return
-    }
-    defer resp.Body.Close()
-
-    // Process the response from the other API as needed
-    // For example, you can read the response body and log it
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        log.Printf("Error reading response body: %v", err)
-        // Handle error
-        return
-    }
-    log.Printf("Response body from /books API: %s", body)
-}
-
-
-
-func addLibrary(w http.ResponseWriter, r *http.Request) {
-    // Add library handler logic...
-    // For example, parse the request body to extract library data
-
-    // Make an API call to another API using POST method
-    requestBody := []byte(`{"username": "user1", "password": "password1"}`)
-    resp, err := http.Post("https://api.example.com/add-library", "application/json", bytes.NewBuffer(requestBody))
-    if err != nil {
-        log.Printf("Error making HTTP POST request to add library: %v", err)
-        // Handle error
-        return
-    }
-    defer resp.Body.Close()
-
-    // Handle the response from the other API as needed
-    // For example, you can read the response body and write it to the response writer
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        log.Printf("Error reading response body: %v", err)
-        // Handle error
-        return
-    }
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(resp.StatusCode)
-    w.Write(body)
-}
-
-
-
-
-package main
-
-import (
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
-	"log"
-	"net/http"
-)
-
-func addLibrary(w http.ResponseWriter, r *http.Request) {
-	// Add library handler logic...
-	// For example, parse the request body to extract library data
-
-	// Define request body
-	requestBody := map[string]string{
-		"username": "user1",
-		"password": "password1",
-	}
-
-	// Convert request body to JSON
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		log.Printf("Error marshaling request body: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Make an API call to another API using POST method
-	resp, err := http.Post("https://api.example.com/add-library", "application/json", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		log.Printf("Error making HTTP POST request to add library: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Handle the response from the other API as needed
-	// For example, you can read the response body and write it to the response writer
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response body: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Set response headers and write response body
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	w.Write(body)
-}
-
-func main() {
-	http.HandleFunc("/add-library", addLibrary)
-
-	log.Println("Server started on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
