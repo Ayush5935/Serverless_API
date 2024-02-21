@@ -1,17 +1,17 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -39,112 +39,116 @@ type Book struct {
 }
 
 func init() {
-	// Load environment variables
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	// Connect to PostgreSQL database
 	db, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
 
-	// Create database tables if they don't exist
 	if err := setupDB(); err != nil {
 		log.Fatalf("Error setting up database: %v", err)
 	}
 }
 
 func main() {
-	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
-		// Running on AWS Lambda
-		lambda.Start(handler)
-	} else {
-		// Running locally
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8080"
-		}
-		log.Printf("Server listening on port %s...", port)
-		log.Fatal(http.ListenAndServe(":"+port, nil))
-	}
-}
+	http.HandleFunc("/register", registerUser)
+	http.HandleFunc("/login", loginUser)
+	http.HandleFunc("/libraries", getAllLibraries)
+	http.HandleFunc("/books", getAllBooks)
+	http.HandleFunc("/add-library", addLibrary)
+	http.HandleFunc("/add-book", addBook)
 
-func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	switch request.HTTPMethod {
-	case "GET":
-		switch request.Path {
-		case "/libraries":
-			libraries, err := getAllLibraries()
-			if err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
-			}
-			body, err := json.Marshal(libraries)
-			if err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
-			}
-			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK, Body: string(body)}, nil
-		case "/books":
-			books, err := getAllBooks()
-			if err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
-			}
-			body, err := json.Marshal(books)
-			if err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
-			}
-			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK, Body: string(body)}, nil
-		default:
-			return events.APIGatewayProxyResponse{StatusCode: http.StatusNotFound}, nil
-		}
-	case "POST":
-		switch request.Path {
-		case "/add-library":
-			var library Library
-			if err := json.Unmarshal([]byte(request.Body), &library); err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, err
-			}
-			if err := addLibrary(library); err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
-			}
-			return events.APIGatewayProxyResponse{StatusCode: http.StatusCreated}, nil
-		case "/add-book":
-			var book Book
-			if err := json.Unmarshal([]byte(request.Body), &book); err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest}, err
-			}
-			if err := addBook(book); err != nil {
-				return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, err
-			}
-			return events.APIGatewayProxyResponse{StatusCode: http.StatusCreated}, nil
-		default:
-			return events.APIGatewayProxyResponse{StatusCode: http.StatusNotFound}, nil
-		}
-	default:
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusMethodNotAllowed}, nil
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
+
+	log.Printf("Server listening on port %s...", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func setupDB() error {
-	// Database setup logic...
+	// Database setup logic remains the same
 }
 
-func getAllLibraries() ([]Library, error) {
-	// Retrieve all libraries from the database
-	// and return them as a slice of Library structs
+func registerUser(w http.ResponseWriter, r *http.Request) {
+	// User registration handler logic remains the same
 }
 
-func getAllBooks() ([]Book, error) {
-	// Retrieve all books from the database
-	// and return them as a slice of Book structs
+func loginUser(w http.ResponseWriter, r *http.Request) {
+	// User login handler logic remains the same
 }
 
-func addLibrary(library Library) error {
-	// Add a new library to the database
+func getAllLibraries(w http.ResponseWriter, r *http.Request) {
+	// Fetch libraries logic remains the same
+
+	// Adjust endpoint URL for AWS Lambda
+	lambdaEndpoint := os.Getenv("LAMBDA_ENDPOINT")
+	if lambdaEndpoint != "" {
+		// Modify the endpoint URL for Lambda
+		lambdaEndpoint += "/books"
+	}
+
+	resp, err := http.Get(lambdaEndpoint)
+	if err != nil {
+		log.Printf("Error making HTTP request: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading response body: %v", err)
+		return
+	}
+	log.Printf("Response body: %s", body)
 }
 
-func addBook(book Book) error {
-	// Add a new book to the database
+func getAllBooks(w http.ResponseWriter, r *http.Request) {
+	// Fetch books logic remains the same
+
+	// Adjust endpoint URL for AWS Lambda
+	lambdaEndpoint := os.Getenv("LAMBDA_ENDPOINT")
+	if lambdaEndpoint != "" {
+		// Modify the endpoint URL for Lambda
+		lambdaEndpoint += "/login"
+	}
+
+	requestBody := map[string]string{
+		"username": "user1",
+		"password": "password1",
+	}
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		log.Printf("Error marshaling request body: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := http.Post(lambdaEndpoint, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		log.Printf("Error making HTTP POST request to add library: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading response body: %v", err)
+		return
+	}
+	log.Printf("Response body: %s", body)
+}
+
+func addLibrary(w http.ResponseWriter, r *http.Request) {
+	// Add library handler logic remains the same
+}
+
+func addBook(w http.ResponseWriter, r *http.Request) {
+	// Add book handler logic remains the same
 }
