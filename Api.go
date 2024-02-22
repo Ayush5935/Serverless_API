@@ -18,19 +18,34 @@ def get_instances(region):
 # Function to extract required information
 def extract_info(instances):
     instance_data = []
+    ec2 = boto3.resource('ec2')
     for reservation in instances:
         for instance in reservation["Instances"]:
             instance_id = instance["InstanceId"]
+            instance_name = ''
+            for tag in instance["Tags"]:
+                if tag["Key"] == "Name":
+                    instance_name = tag["Value"]
+                    break
             subnet_id = instance["SubnetId"]
             vpc_id = instance["VpcId"]
-            instance_data.append([instance_id, subnet_id, vpc_id])
+            
+            # Get instance name
+            subnet = ec2.Subnet(subnet_id)
+            subnet_name = subnet.tags[0]['Value'] if subnet.tags else ''
+            
+            # Get VPC name
+            vpc = ec2.Vpc(vpc_id)
+            vpc_name = vpc.tags[0]['Value'] if vpc.tags else ''
+            
+            instance_data.append([instance_id, instance_name, subnet_id, subnet_name, vpc_id, vpc_name])
     return instance_data
 
 # Function to save data to CSV
 def save_to_csv(data):
     with open("aws_instances.csv", "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Instance ID", "Subnet ID", "VPC ID"])
+        writer.writerow(["Instance ID", "Instance Name", "Subnet ID", "Subnet Name", "VPC ID", "VPC Name"])
         writer.writerows(data)
 
 # Main function
