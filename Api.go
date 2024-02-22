@@ -1,56 +1,54 @@
 import boto3
 import csv
 
-# Regions to search
-regions = ["us-west-1", "us-west-2", "us-east-1", "us-east-2"]
+# Region to search
+region = "us-west-1"
 
 # Function to get instances matching the specified naming pattern
-def get_instances(region):
+def get_instances():
     ec2_client = boto3.client("ec2", region_name=region)
-    response = ec2_client.describe_instances(
+    instance_data = []
+    paginator = ec2_client.get_paginator("describe_instances")
+    response_iterator = paginator.paginate(
         Filters=[
             {"Name": "tag:Name", "Values": ["CS-PE*", "CS-R*"]}
         ]
     )
-    instances = response["Reservations"]
-    return instances
+    for page in response_iterator:
+        reservations = page["Reservations"]
+        for reservation in reservations:
+            for instance in reservation["Instances"]:
+                instance_data.append(instance)
+    return instance_data
 
 # Function to extract required information
 def extract_info(instances):
     instance_data = []
-    ec2 = boto3.resource('ec2')
-    for reservation in instances:
-        for instance in reservation["Instances"]:
-            instance_id = instance["InstanceId"]
-            instance_name = ''
-            for tag in instance["Tags"]:
-                if tag["Key"] == "Name":
-                    instance_name = tag["Value"]
-                    break
-            subnet_id = instance.get("SubnetId", "")
-            subnet_name = ""
-            vpc_id = instance.get("VpcId", "")
-            vpc_name = ""
-            
-            # Get subnet name
+    ec2 = boto3.resource('ec2', region_name=region)
+    for instance in instances:
+        instance_id = instance["InstanceId"]
+        instance_name = ''
+        for tag in instance["Tags"]:
+            if tag["Key"] == "Name":
+                instance_name = tag["Value"]
+                break
+        subnet_id = instance.get("SubnetId", "")
+        subnet_name = ""
+        vpc_id = instance.get("VpcId", "")
+        vpc_name = ""
+        
+        try:
             if subnet_id:
-                try:
-                    subnet = ec2.Subnet(subnet_id)
-                    subnet_name = subnet.tags[0]['Value'] if subnet.tags else ""
-                except Exception as e:
-                    print(f"Error retrieving subnet details for subnet {subnet_id}: {e}")
-                    continue  # Skip this instance if subnet information cannot be retrieved
-            
-            # Get VPC name
+                subnet = ec2.Subnet(subnet_id)
+                subnet_name = subnet.tags[0]['Value'] if subnet.tags else ""
+                
             if vpc_id:
-                try:
-                    vpc = ec2.Vpc(vpc_id)
-                    vpc_name = vpc.tags[0]['Value'] if vpc.tags else ""
-                except Exception as e:
-                    print(f"Error retrieving VPC details for VPC {vpc_id}: {e}")
-                    continue  # Skip this instance if VPC information cannot be retrieved
-            
+                vpc = ec2.Vpc(vpc_id)
+                vpc_name = vpc.tags[0]['Value'] if vpc.tags else ""
+                
             instance_data.append([instance_id, instance_name, subnet_id, subnet_name, vpc_id, vpc_name])
+        except Exception as e:
+            print(f"Error retrieving information for instance {instance_id}: {e}")
     return instance_data
 
 # Function to save data to CSV
@@ -62,12 +60,9 @@ def save_to_csv(data):
 
 # Main function
 def main():
-    all_instance_data = []
-    for region in regions:
-        instances = get_instances(region)
-        instance_data = extract_info(instances)
-        all_instance_data.extend(instance_data)
-    save_to_csv(all_instance_data)
+    instances = get_instances()
+    instance_data = extract_info(instances)
+    save_to_csv(instance_data)
 
 if __name__ == "__main__":
     main()
