@@ -27,16 +27,26 @@ def extract_info(instances):
                 if tag["Key"] == "Name":
                     instance_name = tag["Value"]
                     break
-            subnet_id = instance["SubnetId"]
-            vpc_id = instance["VpcId"]
+            subnet_id = instance.get("SubnetId", "")
+            subnet_name = ""
+            vpc_id = instance.get("VpcId", "")
+            vpc_name = ""
             
-            # Get instance name
-            subnet = ec2.Subnet(subnet_id)
-            subnet_name = subnet.tags[0]['Value'] if subnet.tags else ''
+            # Get subnet name
+            if subnet_id:
+                try:
+                    subnet = ec2.Subnet(subnet_id)
+                    subnet_name = subnet.tags[0]['Value'] if subnet.tags else ""
+                except Exception as e:
+                    print(f"Error retrieving subnet details for subnet {subnet_id}: {e}")
             
             # Get VPC name
-            vpc = ec2.Vpc(vpc_id)
-            vpc_name = vpc.tags[0]['Value'] if vpc.tags else ''
+            if vpc_id:
+                try:
+                    vpc = ec2.Vpc(vpc_id)
+                    vpc_name = vpc.tags[0]['Value'] if vpc.tags else ""
+                except Exception as e:
+                    print(f"Error retrieving VPC details for VPC {vpc_id}: {e}")
             
             instance_data.append([instance_id, instance_name, subnet_id, subnet_name, vpc_id, vpc_name])
     return instance_data
