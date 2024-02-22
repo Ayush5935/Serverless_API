@@ -1,11 +1,11 @@
 import boto3
 import csv
 
-# Region to search
-region = "us-west-1"
+# Regions to search
+regions = ["us-west-1", "us-west-2", "us-east-1", "us-east-2"]
 
 # Function to get instances matching the specified naming pattern
-def get_instances():
+def get_instances(region):
     ec2_client = boto3.client("ec2", region_name=region)
     instance_data = []
     paginator = ec2_client.get_paginator("describe_instances")
@@ -22,7 +22,7 @@ def get_instances():
     return instance_data
 
 # Function to extract required information
-def extract_info(instances):
+def extract_info(instances, region):
     instance_data = []
     ec2 = boto3.resource('ec2', region_name=region)
     for instance in instances:
@@ -55,14 +55,17 @@ def extract_info(instances):
 def save_to_csv(data):
     with open("aws_instances.csv", "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Instance ID", "Instance Name", "Subnet ID", "Subnet Name", "VPC ID", "VPC Name"])
+        writer.writerow(["Region", "Instance ID", "Instance Name", "Subnet ID", "Subnet Name", "VPC ID", "VPC Name"])
         writer.writerows(data)
 
 # Main function
 def main():
-    instances = get_instances()
-    instance_data = extract_info(instances)
-    save_to_csv(instance_data)
+    all_instance_data = []
+    for region in regions:
+        instances = get_instances(region)
+        instance_data = extract_info(instances, region)
+        all_instance_data.extend(instance_data)
+    save_to_csv(all_instance_data)
 
 if __name__ == "__main__":
     main()
