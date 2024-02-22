@@ -1,154 +1,46 @@
-package main
+import boto3
+import csv
 
-import (
-	"bytes"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"os"
-	"strconv"
-	"time"
+# Regions to search
+regions = ["us-west-1", "us-west-2", "us-east-1", "us-east-2"]
 
-	"github.com/google/uuid"
-	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
-)
+# Function to get instances matching the specified naming pattern
+def get_instances(region):
+    ec2_client = boto3.client("ec2", region_name=region)
+    response = ec2_client.describe_instances(
+        Filters=[
+            {"Name": "tag:Name", "Values": ["CS-PE*", "CS-R*"]}
+        ]
+    )
+    instances = response["Reservations"]
+    return instances
 
-var db *sql.DB
+# Function to extract required information
+def extract_info(instances):
+    instance_data = []
+    for reservation in instances:
+        for instance in reservation["Instances"]:
+            instance_id = instance["InstanceId"]
+            subnet_id = instance["SubnetId"]
+            vpc_id = instance["VpcId"]
+            instance_data.append([instance_id, subnet_id, vpc_id])
+    return instance_data
 
-type User struct {
-	ID        uuid.UUID `json:"id"`
-	Username  string    `json:"username"`
-	Password  string    `json:"password"`
-	CreatedAt time.Time `json:"created_at"`
-}
+# Function to save data to CSV
+def save_to_csv(data):
+    with open("aws_instances.csv", "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Instance ID", "Subnet ID", "VPC ID"])
+        writer.writerows(data)
 
-type Library struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
-}
+# Main function
+def main():
+    all_instance_data = []
+    for region in regions:
+        instances = get_instances(region)
+        instance_data = extract_info(instances)
+        all_instance_data.extend(instance_data)
+    save_to_csv(all_instance_data)
 
-type Book struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	Author    string    `json:"author"`
-	LibraryID uuid.UUID `json:"library_id"`
-}
-
-func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	db, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Fatalf("Error connecting to database: %v", err)
-	}
-
-	if err := setupDB(); err != nil {
-		log.Fatalf("Error setting up database: %v", err)
-	}
-}
-
-func main() {
-	http.HandleFunc("/register", registerUser)
-	http.HandleFunc("/login", loginUser)
-	http.HandleFunc("/libraries", getAllLibraries)
-	http.HandleFunc("/books", getAllBooks)
-	http.HandleFunc("/add-library", addLibrary)
-	http.HandleFunc("/add-book", addBook)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("Server listening on port %s...", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
-}
-
-func setupDB() error {
-	// Database setup logic remains the same
-}
-
-func registerUser(w http.ResponseWriter, r *http.Request) {
-	// User registration handler logic remains the same
-}
-
-func loginUser(w http.ResponseWriter, r *http.Request) {
-	// User login handler logic remains the same
-}
-
-func getAllLibraries(w http.ResponseWriter, r *http.Request) {
-	// Fetch libraries logic remains the same
-
-	// Adjust endpoint URL for AWS Lambda
-	lambdaEndpoint := os.Getenv("LAMBDA_ENDPOINT")
-	if lambdaEndpoint != "" {
-		// Modify the endpoint URL for Lambda
-		lambdaEndpoint += "/books"
-	}
-
-	resp, err := http.Get(lambdaEndpoint)
-	if err != nil {
-		log.Printf("Error making HTTP request: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response body: %v", err)
-		return
-	}
-	log.Printf("Response body: %s", body)
-}
-
-func getAllBooks(w http.ResponseWriter, r *http.Request) {
-	// Fetch books logic remains the same
-
-	// Adjust endpoint URL for AWS Lambda
-	lambdaEndpoint := os.Getenv("LAMBDA_ENDPOINT")
-	if lambdaEndpoint != "" {
-		// Modify the endpoint URL for Lambda
-		lambdaEndpoint += "/login"
-	}
-
-	requestBody := map[string]string{
-		"username": "user1",
-		"password": "password1",
-	}
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		log.Printf("Error marshaling request body: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := http.Post(lambdaEndpoint, "application/json", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		log.Printf("Error making HTTP POST request to add library: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response body: %v", err)
-		return
-	}
-	log.Printf("Response body: %s", body)
-}
-
-func addLibrary(w http.ResponseWriter, r *http.Request) {
-	// Add library handler logic remains the same
-}
-
-func addBook(w http.ResponseWriter, r *http.Request) {
-	// Add book handler logic remains the same
-}
+if __name__ == "__main__":
+    main()
