@@ -39,6 +39,7 @@ def extract_info(instances):
                     subnet_name = subnet.tags[0]['Value'] if subnet.tags else ""
                 except Exception as e:
                     print(f"Error retrieving subnet details for subnet {subnet_id}: {e}")
+                    continue  # Skip this instance if subnet information cannot be retrieved
             
             # Get VPC name
             if vpc_id:
@@ -47,6 +48,7 @@ def extract_info(instances):
                     vpc_name = vpc.tags[0]['Value'] if vpc.tags else ""
                 except Exception as e:
                     print(f"Error retrieving VPC details for VPC {vpc_id}: {e}")
+                    continue  # Skip this instance if VPC information cannot be retrieved
             
             instance_data.append([instance_id, instance_name, subnet_id, subnet_name, vpc_id, vpc_name])
     return instance_data
