@@ -70,39 +70,32 @@ def get_vpc_subnet_id(instance_id, access_token, region):
 
 # Main function
 def main():
-    input_file = 'input.csv'  # Input CSV file containing Account ID and Instance ID columns
+    input_file = 'input.csv'  # Input CSV file containing Account ID, Instance ID, and Region columns
     output_file = 'output.csv'  # Output CSV file to store results
 
     # Get SSO access token
     access_token = get_sso_access_token()
 
-    # List of US regions
-    us_regions = ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2']
-
     # Open output CSV file for writing
     with open(output_file, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Account ID', 'Instance ID', 'VPC ID', 'Subnet ID'])  # Write header
+        writer.writerow(['Account ID', 'Instance ID', 'Region', 'VPC ID', 'Subnet ID'])  # Write header
 
         # Open input CSV file for reading
         with open(input_file, mode='r') as csvfile:
-            reader = csv.reader(csvfile)
-
-            # Skip header row
-            next(reader)
+            reader = csv.DictReader(csvfile)
 
             # Iterate over rows in input CSV file
             for row in reader:
-                account_id, instance_id = row
+                account_id = row['Account ID']
+                instance_id = row['Instance ID']
+                region = row['Region']
 
-                # Get VPC ID and Subnet ID using SSO for each region
-                for region in us_regions:
-                    try:
-                        vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token, region)
-                        writer.writerow([account_id, instance_id, vpc_id, subnet_id])
-                        break  # If successful, break out of the loop and proceed to the next instance
-                    except Exception as e:
-                        print(f"Error processing instance {instance_id} in region {region}: {e}")
+                try:
+                    vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token, region)
+                    writer.writerow([account_id, instance_id, region, vpc_id, subnet_id])
+                except Exception as e:
+                    print(f"Error processing instance {instance_id} in region {region}: {e}")
 
     print(f"Results saved to {output_file}")
 
