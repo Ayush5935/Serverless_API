@@ -72,22 +72,19 @@ def main():
 
     with open(output_file, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Account ID', 'Instance ID', 'VPC ID', 'Subnet ID'])
+        writer.writerow(['Account ID', 'Instance ID', 'Region', 'VPC ID', 'Subnet ID'])
 
         with open(input_file, mode='r') as csvfile:
             reader = csv.reader(csvfile)
             next(reader)
             for row in reader:
-                account_id, instance_id = row
-                regions = ['us-west-1', 'us-west-2', 'us-east-1', 'us-east-2']  # Update with all four regions
+                account_id, instance_id, region = row
 
-                for region in regions:
-                    try:
-                        vpc_id, subnet_id = get_vpc_subnet_id(instance_id, account_id, access_token, region)
-                        writer.writerow([account_id, instance_id, vpc_id, subnet_id])
-                        break  # If successful, break out of the loop and proceed to the next instance
-                    except Exception as e:
-                        print(f"Error processing instance {instance_id} in region {region}: {e}")
+                try:
+                    vpc_id, subnet_id = get_vpc_subnet_id(instance_id, account_id, access_token, region)
+                    writer.writerow([account_id, instance_id, region, vpc_id, subnet_id])
+                except Exception as e:
+                    print(f"Error processing instance {instance_id} in region {region}: {e}")
 
     print(f"Results saved to {output_file}")
 
