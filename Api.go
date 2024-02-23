@@ -63,6 +63,7 @@ def assume_role_and_create_ec2_client(access_token, region):
 def main():
     # Read CSV file containing Instance ID column
     input_file = 'instances.csv'  # Update with your input file path
+    output_file = 'instance_details.csv'  # Update with your output file path
 
     access_token = get_sso_access_token()
 
@@ -74,6 +75,9 @@ def main():
     # Assume IAM role and create EC2 client
     ec2_client = assume_role_and_create_ec2_client(access_token, 'us-west-2')  # Update with your region
 
+    # List to store instance details
+    instance_details = []
+
     # Iterate over each instance ID
     for instance_id in instances:
         # Get network info for instance
@@ -82,12 +86,17 @@ def main():
             instance = response['Reservations'][0]['Instances'][0]
             vpc_id = instance['VpcId']
             subnet_id = instance['SubnetId']
-            print(f"Instance ID: {instance_id}, VPC ID: {vpc_id}, Subnet ID: {subnet_id}")
+            instance_details.append([instance_id, vpc_id, subnet_id])
         except Exception as e:
             print(f"Error occurred while retrieving network info for instance {instance_id}: {e}")
 
-    print("Process completed successfully.")
+    # Write instance details to output CSV file
+    with open(output_file, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(['Instance ID', 'VPC ID', 'Subnet ID'])
+        csvwriter.writerows(instance_details)
+
+    print(f"Instance details written to {output_file}")
 
 if __name__ == "__main__":
     main()
-￼Enter
