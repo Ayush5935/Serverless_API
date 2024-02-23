@@ -1,6 +1,5 @@
 import csv
 import boto3
-from time import sleep
 
 # Function to obtain SSO access token
 def get_sso_access_token():
@@ -36,23 +35,25 @@ def get_sso_access_token():
             pass
     raise Exception("Failed to obtain SSO access token")
 
-# Function to get VPC ID and Subnet ID
+# Function to get VPC ID and Subnet ID for an instance
 def get_vpc_subnet_id(instance_id, access_token):
     session = boto3.session.Session()
-    region = 'us-west-2'  # Update with your region
-    sso = session.client('sso', region_name=region)
+    sso = session.client('sso', region_name='us-west-2')  # Update with your region
+
+    # Get account ID
+    account_id = boto3.client('sts').get_caller_identity().get('Account')
 
     # Assume role
     role_credentials = sso.get_role_credentials(
         roleName='DishWPaaSAdministrator',
-        accountId='your_account_id',  # Update with your AWS account ID
+        accountId=account_id,
         accessToken=access_token
     )['roleCredentials']
 
     # Create EC2 client with assumed role credentials
     ec2 = boto3.client(
         'ec2',
-        region_name=region,
+        region_name='us-west-2',  # Update with your region
         aws_access_key_id=role_credentials['accessKeyId'],
         aws_secret_access_key=role_credentials['secretAccessKey'],
         aws_session_token=role_credentials['sessionToken']
