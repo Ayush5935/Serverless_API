@@ -36,9 +36,9 @@ def get_sso_access_token():
     raise Exception("Failed to obtain SSO access token")
 
 # Function to get VPC ID and Subnet ID for an instance
-def get_vpc_subnet_id(instance_id, access_token):
+def get_vpc_subnet_id(instance_id, access_token, region):
     session = boto3.session.Session()
-    sso = session.client('sso', region_name='us-west-2')  # Update with your region
+    sso = session.client('sso', region_name=region)
 
     # Get account ID
     account_id = boto3.client('sts').get_caller_identity().get('Account')
@@ -53,7 +53,7 @@ def get_vpc_subnet_id(instance_id, access_token):
     # Create EC2 client with assumed role credentials
     ec2 = boto3.client(
         'ec2',
-        region_name='us-west-2',  # Update with your region
+        region_name=region,
         aws_access_key_id=role_credentials['accessKeyId'],
         aws_secret_access_key=role_credentials['secretAccessKey'],
         aws_session_token=role_credentials['sessionToken']
@@ -92,12 +92,14 @@ def main():
             for row in reader:
                 account_id, instance_id = row
 
-                # Get VPC ID and Subnet ID using SSO
-                try:
-                    vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token)
-                    writer.writerow([account_id, instance_id, vpc_id, subnet_id])
-                except Exception as e:
-                    print(f"Error processing instance {instance_id}: {e}")
+                # Get VPC ID and Subnet ID using SSO for each region
+                for region in boto3.session.Session().get_available_regions('ec2'):
+                    try:
+                        vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token, region)
+                        writer.writerow([account_id, instance_id, vpc_id, subnet_id])
+                        break  # If successful, break out of the loop and proceed to the next instance
+                    except Exception as e:
+                        print(f"Error processing instance {instance_id} in region {region}: {e}")
 
     print(f"Results saved to {output_file}")
 
