@@ -1,3 +1,4 @@
+import os
 import boto3
 import csv
 
@@ -46,10 +47,15 @@ def extract_info(instances, region):
 
 # Function to save data to CSV
 def save_to_csv(data):
-    with open("aws_instances.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["Region", "Account", "Instance ID", "Instance Name", "Subnet ID", "Subnet Name", "VPC ID", "VPC Name"])
-        writer.writerows(data)
+    if os.path.exists("aws_instances.csv"):
+        with open("aws_instances.csv", "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows(data)
+    else:
+        with open("aws_instances.csv", "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Region", "Account", "Instance ID", "Instance Name", "Subnet ID", "Subnet Name", "VPC ID", "VPC Name"])
+            writer.writerows(data)
 
 # Main function
 def main():
