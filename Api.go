@@ -36,7 +36,7 @@ def get_sso_access_token():
             pass
     raise Exception("Failed to obtain SSO access token")
 
-# Function to get VPC ID and Subnet ID for an instance
+# Function to get VPC ID and Subnet ID for an instance in a specific region
 def get_vpc_subnet_id(instance_id, access_token, region):
     session = boto3.session.Session()
     sso = session.client('sso', region_name=region)
@@ -44,23 +44,23 @@ def get_vpc_subnet_id(instance_id, access_token, region):
     # Get account ID
     account_id = boto3.client('sts').get_caller_identity().get('Account')
 
-    # Assume role
-    role_credentials = sso.get_role_credentials(
-        roleName='DishWPaaSAdministrator',
-        accountId=account_id,
-        accessToken=access_token
-    )['roleCredentials']
-
-    # Create EC2 client with assumed role credentials
-    ec2 = boto3.client(
-        'ec2',
-        region_name=region,
-        aws_access_key_id=role_credentials['accessKeyId'],
-        aws_secret_access_key=role_credentials['secretAccessKey'],
-        aws_session_token=role_credentials['sessionToken']
-    )
-
     try:
+        # Assume role
+        role_credentials = sso.get_role_credentials(
+            roleName='DishWPaaSAdministrator',
+            accountId=account_id,
+            accessToken=access_token
+        )['roleCredentials']
+
+        # Create EC2 client with assumed role credentials
+        ec2 = boto3.client(
+            'ec2',
+            region_name=region,
+            aws_access_key_id=role_credentials['accessKeyId'],
+            aws_secret_access_key=role_credentials['secretAccessKey'],
+            aws_session_token=role_credentials['sessionToken']
+        )
+
         # Describe instance
         response = ec2.describe_instances(InstanceIds=[instance_id])
 
@@ -72,6 +72,7 @@ def get_vpc_subnet_id(instance_id, access_token, region):
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidInstanceID.NotFound':
             print(f"Instance {instance_id} not found in region {region}")
+            return None, None
         else:
             raise e
 
@@ -104,12 +105,10 @@ def main():
 
                 # Get VPC ID and Subnet ID using SSO for each region
                 for region in us_regions:
-                    try:
-                        vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token, region)
+                    vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token, region)
+                    if vpc_id is not None and subnet_id is not None:
                         writer.writerow([account_id, instance_id, vpc_id, subnet_id])
                         break  # If successful, break out of the loop and proceed to the next instance
-                    except Exception as e:
-                        print(f"Error processing instance {instance_id} in region {region}: {e}")
 
     print(f"Results saved to {output_file}")
 
