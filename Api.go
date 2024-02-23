@@ -1,6 +1,5 @@
 import csv
 import boto3
-import webbrowser
 from time import sleep
 
 # Function to obtain SSO access token
@@ -22,9 +21,6 @@ def get_sso_access_token():
     expires_in = device_authorization['expiresIn']
     interval = device_authorization['interval']
 
-    # Open browser for user authentication
-    webbrowser.open(url, autoraise=True)
-
     # Poll for token
     for _ in range(1, expires_in // interval + 1):
         sleep(interval)
@@ -40,63 +36,69 @@ def get_sso_access_token():
             pass
     raise Exception("Failed to obtain SSO access token")
 
-# Function to assume IAM role and create EC2 client
-def assume_role_and_create_ec2_client(access_token, region):
-    sso = boto3.client('sso', region_name=region)
+# Function to get VPC ID and Subnet ID
+def get_vpc_subnet_id(instance_id, access_token):
+    session = boto3.session.Session()
+    region = 'us-west-2'  # Update with your region
+    sso = session.client('sso', region_name=region)
 
     # Assume role
     role_credentials = sso.get_role_credentials(
         roleName='DishWPaaSAdministrator',
+        accountId='your_account_id',  # Update with your AWS account ID
         accessToken=access_token
     )['roleCredentials']
 
     # Create EC2 client with assumed role credentials
-    session = boto3.Session(
+    ec2 = boto3.client(
+        'ec2',
         region_name=region,
         aws_access_key_id=role_credentials['accessKeyId'],
         aws_secret_access_key=role_credentials['secretAccessKey'],
         aws_session_token=role_credentials['sessionToken']
     )
-    return session.client('ec2')
+
+    # Describe instance
+    response = ec2.describe_instances(InstanceIds=[instance_id])
+
+    # Extract VPC ID and Subnet ID
+    vpc_id = response['Reservations'][0]['Instances'][0]['VpcId']
+    subnet_id = response['Reservations'][0]['Instances'][0]['SubnetId']
+
+    return vpc_id, subnet_id
 
 # Main function
 def main():
-    # Read CSV file containing Instance ID column
-    input_file = 'instances.csv'  # Update with your input file path
-    output_file = 'instance_details.csv'  # Update with your output file path
+    input_file = 'input.csv'  # Input CSV file containing Account ID and Instance ID columns
+    output_file = 'output.csv'  # Output CSV file to store results
 
+    # Get SSO access token
     access_token = get_sso_access_token()
 
-    with open(input_file, 'r') as csvfile:
-        csvreader = csv.reader(csvfile)
-        next(csvreader)  # Skip header row
-        instances = [row[0] for row in csvreader]
+    # Open output CSV file for writing
+    with open(output_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Account ID', 'Instance ID', 'VPC ID', 'Subnet ID'])  # Write header
 
-    # Assume IAM role and create EC2 client
-    ec2_client = assume_role_and_create_ec2_client(access_token, 'us-west-2')  # Update with your region
+        # Open input CSV file for reading
+        with open(input_file, mode='r') as csvfile:
+            reader = csv.reader(csvfile)
 
-    # List to store instance details
-    instance_details = []
+            # Skip header row
+            next(reader)
 
-    # Iterate over each instance ID
-    for instance_id in instances:
-        # Get network info for instance
-        try:
-            response = ec2_client.describe_instances(InstanceIds=[instance_id])
-            instance = response['Reservations'][0]['Instances'][0]
-            vpc_id = instance['VpcId']
-            subnet_id = instance['SubnetId']
-            instance_details.append([instance_id, vpc_id, subnet_id])
-        except Exception as e:
-            print(f"Error occurred while retrieving network info for instance {instance_id}: {e}")
+            # Iterate over rows in input CSV file
+            for row in reader:
+                account_id, instance_id = row
 
-    # Write instance details to output CSV file
-    with open(output_file, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(['Instance ID', 'VPC ID', 'Subnet ID'])
-        csvwriter.writerows(instance_details)
+                # Get VPC ID and Subnet ID using SSO
+                try:
+                    vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token)
+                    writer.writerow([account_id, instance_id, vpc_id, subnet_id])
+                except Exception as e:
+                    print(f"Error processing instance {instance_id}: {e}")
 
-    print(f"Instance details written to {output_file}")
+    print(f"Results saved to {output_file}")
 
 if __name__ == "__main__":
     main()
