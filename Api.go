@@ -76,6 +76,9 @@ def main():
     # Get SSO access token
     access_token = get_sso_access_token()
 
+    # List of US regions
+    us_regions = ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2']
+
     # Open output CSV file for writing
     with open(output_file, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -93,7 +96,7 @@ def main():
                 account_id, instance_id = row
 
                 # Get VPC ID and Subnet ID using SSO for each region
-                for region in boto3.session.Session().get_available_regions('ec2'):
+                for region in us_regions:
                     try:
                         vpc_id, subnet_id = get_vpc_subnet_id(instance_id, access_token, region)
                         writer.writerow([account_id, instance_id, vpc_id, subnet_id])
