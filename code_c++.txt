@@ -1,0 +1,208 @@
+#include <iostream>
+#include <windows.h>
+#include <winspool.h>
+#include <ctime>
+
+void DisplayPrintJobs() {
+    HANDLE hPrinter;
+    DWORD dwNeeded, dwReturned, i;
+    JOB_INFO_1 *pJobInfo;
+
+    // Open a handle to the printer
+    if (!OpenPrinter(NULL, &hPrinter, NULL)) {
+        std::cerr << "Failed to open printer" << std::endl;
+        return;
+    }
+
+    // Enumerate all print jobs
+    if (!EnumJobs(hPrinter, 0, -1, 1, NULL, 0, &dwNeeded, &dwReturned)) {
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+            std::cerr << "Failed to enumerate print jobs" << std::endl;
+            ClosePrinter(hPrinter);
+            return;
+        }
+    }
+
+    pJobInfo = (JOB_INFO_1 *)malloc(dwNeeded);
+    if (!pJobInfo) {
+        std::cerr << "Memory allocation failed" << std::endl;
+        ClosePrinter(hPrinter);
+        return;
+    }
+
+    if (!EnumJobs(hPrinter, 0, -1, 1, (LPBYTE)pJobInfo, dwNeeded, &dwNeeded, &dwReturned)) {
+        std::cerr << "Failed to enumerate print jobs" << std::endl;
+        free(pJobInfo);
+        ClosePrinter(hPrinter);
+        return;
+    }
+
+    // Display print job information
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "Print Jobs:" << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+
+    for (i = 0; i < dwReturned; i++) {
+        std::cout << "Job ID: " << pJobInfo[i].JobId << std::endl;
+        std::cout << "Document: " << pJobInfo[i].pDocument << std::endl;
+        std::cout << "Printer: " << pJobInfo[i].pPrinterName << std::endl;
+        std::cout << "Status: " << pJobInfo[i].Status << std::endl;
+        std::cout << "Status Message: " << pJobInfo[i].pStatus << std::endl;
+        std::cout << "Total Pages: " << pJobInfo[i].TotalPages << std::endl;
+
+        // Convert SYSTEMTIME to time_t
+        FILETIME ft;
+        SystemTimeToFileTime(&pJobInfo[i].Submitted, &ft);
+        ULARGE_INTEGER uli;
+        uli.LowPart = ft.dwLowDateTime;
+        uli.HighPart = ft.dwHighDateTime;
+        time_t submittedTime = (uli.QuadPart - 116444736000000000) / 10000000; // Convert 100-nanosecond intervals to seconds
+        std::cout << "Submitted: " << std::asctime(std::localtime(&submittedTime)) << std::endl;
+
+        std::cout << "----------------------------------------" << std::endl;
+    }
+
+    free(pJobInfo);
+    ClosePrinter(hPrinter);
+}
+
+int main() {
+    int choice;
+    do {
+        std::cout << "1. Display Print Jobs" << std::endl;
+        std::cout << "2. Exit" << std::endl;
+        std::cout << "Enter your choice: ";
+        std::cin >> choice;
+
+        switch (choice) {
+            case 1:
+                DisplayPrintJobs();
+                break;
+            case 2:
+                std::cout << "Exiting..." << std::endl;
+                break;
+            default:
+                std::cout << "Invalid choice. Please try again." << std::endl;
+        }
+    } while (choice != 2);
+
+    return 0;
+}
+
+
+
+
+
+
+
+#include <Windows.h>
+#include <Winspool.h>
+#include <string>
+
+// Global variables
+HWND g_hListBox;
+HINSTANCE g_hInstance;
+
+// Function to update the list box with print job information
+void UpdateListBox() {
+    // Clear the list box
+    SendMessage(g_hListBox, LB_RESETCONTENT, 0, 0);
+
+    // Get printer handle
+    HANDLE hPrinter;
+    if (!OpenPrinter(NULL, &hPrinter, NULL)) {
+        MessageBox(NULL, L"Failed to open printer", L"Error", MB_ICONERROR);
+        return;
+    }
+
+    // Get job count and information
+    DWORD dwJobCount;
+    JOB_INFO_1* pJobInfo;
+    if (!EnumJobs(hPrinter, 0, -1, 1, NULL, 0, &dwJobCount, NULL)) {
+        MessageBox(NULL, L"Failed to enumerate jobs", L"Error", MB_ICONERROR);
+        ClosePrinter(hPrinter);
+        return;
+    }
+
+    pJobInfo = (JOB_INFO_1*)malloc(dwJobCount * sizeof(JOB_INFO_1));
+    if (!pJobInfo) {
+        MessageBox(NULL, L"Memory allocation failed", L"Error", MB_ICONERROR);
+        ClosePrinter(hPrinter);
+        return;
+    }
+
+    if (!EnumJobs(hPrinter, 0, dwJobCount, 1, (LPBYTE)pJobInfo, dwJobCount * sizeof(JOB_INFO_1), &dwJobCount, NULL)) {
+        MessageBox(NULL, L"Failed to enumerate jobs", L"Error", MB_ICONERROR);
+        ClosePrinter(hPrinter);
+        free(pJobInfo);
+        return;
+    }
+
+    // Add job information to the list box
+    for (DWORD i = 0; i < dwJobCount; i++) {
+        std::wstring jobText = L"Job ID: " + std::to_wstring(pJobInfo[i].JobId) + L", Document: " + std::wstring(pJobInfo[i].pDocument);
+        SendMessage(g_hListBox, LB_ADDSTRING, 0, (LPARAM)jobText.c_str());
+    }
+
+    // Cleanup
+    ClosePrinter(hPrinter);
+    free(pJobInfo);
+}
+
+// Window procedure
+LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+    case WM_CREATE: {
+        // Create list box
+        g_hListBox = CreateWindowEx(0, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | LBS_NOSEL | LBS_HASSTRINGS,
+            10, 10, 400, 300, hWnd, NULL, g_hInstance, NULL);
+        if (!g_hListBox) {
+            MessageBox(NULL, L"Failed to create list box", L"Error", MB_ICONERROR);
+            return -1;
+        }
+
+        // Update list box
+        UpdateListBox();
+        break;
+    }
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Entry point
+int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    g_hInstance = hInstance;
+
+    // Register window class
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"PrintJobTracker";
+    RegisterClass(&wc);
+
+    // Create window
+    HWND hWnd = CreateWindowEx(0, L"PrintJobTracker", L"Print Job Tracker", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
+    if (!hWnd) {
+        MessageBox(NULL, L"Failed to create window", L"Error", MB_ICONERROR);
+        return -1;
+    }
+
+    // Show window
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Message loop
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return 0;
+}
